@@ -1,0 +1,39 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticsearch-fluentd-config
+  namespace: {{ .Values.global.namespace }}
+data:
+  fluentd.conf: |
+    <source>
+      @type tail
+      path /usr/share/elasticsearch/logs/*.log
+      pos_file /tmp/log.pos
+      read_from_head true
+      <parse>
+        @type regexp
+        expression /^(?<msg>.*)$/
+        #13 Nov 2020 10:53:45.069,
+        #time_format %d %m %Y %H:%M:%S.mili
+      </parse>
+      tag graylog2
+    </source>
+
+    <filter graylog2.**>
+      @type record_transformer
+      <record>
+        facility "elasticsearch"
+        component "elasticsearch"
+        facet "elasticsearch"
+        tag ${tag}
+        namespace {{ .Values.global.namespace | quote }}
+      </record>
+    </filter>
+
+    <match graylog2.**>
+      @type gelf
+      host graylog 
+      port 12201
+      protocol udp
+    </match>

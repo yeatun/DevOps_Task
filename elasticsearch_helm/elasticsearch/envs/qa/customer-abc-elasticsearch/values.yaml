@@ -1,0 +1,20 @@
+global:
+  name: customer-abc-elasticsearch
+  namespace: default
+  esVersion: 7
+  esURI: http://customer-abc-headless:9200
+deployment:
+  serviceName: customer-abc-elasticsearch-headless
+  clusterNodes: customer-abc-elasticsearch-0,customer-abc-elasticsearch-1,customer-abc-elasticsearch-2,
+  containers:
+    images: elasticsearch:7.17.3
+    resources:
+      requests:
+        cpu: 0.2
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 2Gi
+  volumeClaimTemplates:
+    storage: 10Gi
+    storageClassName: longhorn
