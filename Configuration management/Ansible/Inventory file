@@ -1,0 +1,7 @@
+[all]
+machine1.example.com
+machine2.example.com
+machine3.example.com
+[all:vars]
+ansible_user=ubuntu
+ansible_ssh_private_key_file=~/.ssh/your-key.pem

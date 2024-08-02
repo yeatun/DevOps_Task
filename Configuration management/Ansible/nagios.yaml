@@ -1,0 +1,135 @@
+---
+- name: Deploy NTP configuration and Nagios monitoring templates
+  hosts: ntp_servers
+  become: true
+  tasks:
+    - name: Install NTP package
+      apt:
+        name: ntp
+        state: present
+
+    - name: Configure NTP
+      copy:
+        dest: /etc/ntp.conf
+        content: |
+          tinker panic 0
+          restrict default nomodify notrap nopeer noquery
+          restrict -6 default kod nomodify notrap nopeer noquery
+          restrict 127.0.0.1
+          restrict ::1
+          server 192.168.0.252 minpoll 4 maxpoll 8
+          server 192.168.0.253 minpoll 4 maxpoll 8
+          server 192.168.0.0 # local clock
+          fudge   192.168.0.0 stratum 10
+          driftfile /var/lib/ntp/drift
+          keys /etc/ntp/keys
+      notify: Restart NTP service
+
+    - name: Ensure NTP is running and enabled
+      service:
+        name: ntp
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Restart NTP service
+      service:
+        name: ntp
+        state: restarted
+
+- name: Deploy Nagios monitoring templates
+  hosts: monitoring
+  become: true
+  tasks:
+    - name: Install Apache and Nagios
+      apt:
+        name: 
+          - apache2
+          - build-essential
+          - libgd-dev
+          - openssl
+          - libssl-dev
+          - unzip
+        state: present
+
+    - name: Install Nagios Core
+      command: /bin/bash -c 'cd /tmp && wget https://assets.nagios.com/downloads/nagioscore/releases/nagios-4.4.6.tar.gz && tar -zxvf nagios-4.4.6.tar.gz && cd nagios-4.4.6 && ./configure --with-httpd-conf=/etc/apache2/sites-enabled && make all && make install-groups-users && usermod -a -G nagios www-data && make install && make install-daemoninit && make install-commandmode && make install-config && make install-webconf'
+
+    - name: Configure Apache for Nagios
+      apache2_module:
+        name: rewrite
+        state: present
+
+    - name: Configure Apache for CGI
+      apache2_module:
+        name: cgi
+        state: present
+
+    - name: Create Nagios admin user
+      command: htpasswd -c /usr/local/nagios/etc/htpasswd.users nagiosadmin
+      args:
+        creates: /usr/local/nagios/etc/htpasswd.users
+
+    - name: Restart Apache
+      service:
+        name: apache2
+        state: restarted
+
+    - name: Start Nagios
+      service:
+        name: nagios
+        state: started
+        enabled: true
+
+    - name: Deploy Nagios configuration for NTP servers
+      copy:
+        dest: /usr/local/nagios/etc/objects/ntp_hosts.cfg
+        content: |
+          define host {
+            host_name               app-vm1.fra1.internal
+            address                 192.168.0.2
+            check_command           check-ping
+            active_checks_enabled   1
+            passive_checks_enabled  1
+          }
+          define service {
+            service_description     ntp_process
+            host_name               app-vm1.fra1.internal
+            check_command           check_ntp
+            check_interval          10
+          }
+          define host {
+            host_name               db-vm1.fra1.db
+            address                 192.168.0.3
+            check_command           check-ping
+            active_checks_enabled   1
+            passive_checks_enabled  1
+          }
+          define service {
+            service_description     ntp_process
+            host_name               db-vm1.fra1.db
+            check_command           check_ntp
+            check_interval          10
+          }
+          define host {
+            host_name               web-vm1.fra1.web
+            address                 192.168.0.4
+            check_command           check-ping
+            active_checks_enabled   1
+            passive_checks_enabled  1
+          }
+          define service {
+            service_description     ntp_process
+            host_name               web-vm1.fra1.web
+            check_command           check_ntp
+            check_interval          10
+          }
+        dest: /etc/nagios/conf.d/ntp_hosts.cfg
+        owner: nagios
+        group: nagios
+        mode: '0644'
+    
+    - name: Restart Nagios service
+      service:
+        name: nagios
+        state: restarted 

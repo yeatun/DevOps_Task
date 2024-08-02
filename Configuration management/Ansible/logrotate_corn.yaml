@@ -1,0 +1,11 @@
+---
+- name: Configure logrotate cron job on all machines
+  hosts: all
+  become: yes
+  tasks:
+    - name: Ensure logrotate cron job is present
+      cron:
+        name: "logrotate"
+        minute: "*/10"
+        hour: "2-4"
+        job: "/usr/sbin/logrotate /etc/logrotate.conf"
